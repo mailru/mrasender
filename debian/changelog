@@ -1,0 +1,5 @@
+tarantool-mrasender (1.0.1) unstable; urgency=low
+
+  * Initial release
+
+ -- Maxim Glekov <m.glekov@corp.mail.ru>  Wed, 16 Sep 2015 11:30:00 +0300
