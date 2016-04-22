@@ -1,4 +1,4 @@
-# mrasender - A set of [Tarantool][] module for sending messages to Mail.Ru Agent
+# mrasender - [Tarantool][] module for sending messages to Mail.Ru Agent
 
 ## Prerequisites
 

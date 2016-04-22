@@ -748,8 +748,8 @@ static int mrasender_func(struct lua_State *L)
 	const char *recipient = lua_tostring(L, 3);
 	const char *msg       = lua_tostring(L, 4);
 
-	lua_pushinteger(L, -1);
-	return send(username, password, recipient, msg);
+	lua_pushinteger(L, send(username, password, recipient, msg));
+	return 1;
 }
 
 LUA_API int luaopen_mrasender_cfunctions(lua_State *L)
@@ -757,7 +757,7 @@ LUA_API int luaopen_mrasender_cfunctions(lua_State *L)
 	/* result is returned from require('mrasender.cfunctions') */
 	lua_newtable(L);
 	static const struct luaL_reg meta [] = {
-		{"send", mrasender_func},
+		{"send_message_to_mra", mrasender_func},
 		{NULL, NULL}
 	};
 	luaL_register(L, NULL, meta);
