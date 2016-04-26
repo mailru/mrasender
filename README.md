@@ -3,19 +3,9 @@
 ## Prerequisites
 
  * Tarantool 1.6.5+ with header files (tarantool && tarantool-dev packages)
- * Msgpuk
 
 ## Installation HowTo
-* Install [Tarantool] && tarantool-dev packages (see http://tarantool.org/download.html)
-* Install Msgpuck, run this as root:
-```
-git clone https://github.com/rtsisyk/msgpuck
-cd msgpuck
-cmake .
-make
-make install
-```
-
+ * Install [Tarantool] && tarantool-dev packages (see http://tarantool.org/download.html)
  * Install mrasender module for [Tarantool]
 ```
 git clone https://github.com/agent-0007/mrasender
