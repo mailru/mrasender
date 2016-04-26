@@ -31,7 +31,7 @@ make install
 #!/usr/bin/env tarantool
 
 box.cfg{
-        log_level = 5
+  log_level = 5
 }
 
 local agent = require('mrasender')
