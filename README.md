@@ -3,7 +3,7 @@
 ## Prerequisites
 
  * Tarantool 1.6.5+ with header files (tarantool && tarantool-dev packages)
- * Msgpuk ( git clone https://github.com/rtsisyk/msgpuck && cd msgpuck && cmake . && make install)
+ * Msgpuk
 
 ## Installation HowTo
 * Install [Tarantool] && tarantool-dev packages (see http://tarantool.org/download.html)
@@ -15,13 +15,16 @@ cmake .
 make
 make install
 ```
+
  * Install mrasender module for [Tarantool]
+```
 git clone https://github.com/agent-0007/mrasender
 cd mrasender
 cmake .
 make
 make install
 ```
+
  * Copy paste LUA script below, save it to file mrasender_test.lua
 ```lua
 
@@ -49,7 +52,6 @@ log.info("Send message to:"..recipient..", result:"..res);
  * Replace USERNAME@mail.ru, PASSWORD, RECIPIENT@mail.ru whith your sending account and recipient account
  * chmod +x mrasender_test.lua
  * Run and enjoy: ./mrasender.lua
-
 
 ## See Also
 
