@@ -5,7 +5,7 @@
  * Tarantool 1.6.5+ with header files (tarantool && tarantool-dev packages)
 
 ## HOWTO
-```
+```lua
 
 #!/usr/bin/env tarantool
 
@@ -18,7 +18,7 @@ local log   = require('log')
 
 local username = 'USERNAME@mail.ru'
 local password = 'PASSWORD'
-local recipient = 'RECIPIENT_EMAIL'
+local recipient = 'RECIPIENT@mail.ru'
 local msg = 'Test message from tarantool'
 
 -- send message to recipient from username
@@ -28,6 +28,7 @@ log.info("Send message to:"..recipient..", result:"..res);
 
 ```
 Enjoy!
+
 Thank your for contributing Tarantool!
 
 ## See Also
