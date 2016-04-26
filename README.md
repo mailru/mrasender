@@ -3,6 +3,7 @@
 ## Prerequisites
 
  * Tarantool 1.6.5+ with header files (tarantool && tarantool-dev packages)
+ * Msgpuk ( git clone https://github.com/rtsisyk/msgpuck && cd msgpuck && cmake . && make install)
 
 ## HOWTO
 ```lua
