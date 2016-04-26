@@ -1,5 +1,7 @@
 # mrasender - [Tarantool][] module for sending messages to Mail.Ru Agent
 
+Warning: recipient must be in your contactlist!
+
 ## Prerequisites
 
  * Tarantool 1.6.5+ with header files (tarantool && tarantool-dev packages)
