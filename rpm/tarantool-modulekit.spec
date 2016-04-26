@@ -37,5 +37,5 @@ make %{?_smp_mflags} check
 %license LICENSE AUTHORS
 
 %changelog
-* Wed Sep 16 2015 Maxim Glekov <m.glekov@corp.mail.ru> 1.0.1
+* Thu Apr 26 2016 Maxim Glekov <m.glekov@corp.mail.ru> 1.0.1
 - Initial version of the RPM spec
