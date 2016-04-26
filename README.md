@@ -29,8 +29,6 @@ log.info("Send message to:"..recipient..", result:"..res);
 ```
 Enjoy!
 
-Thank your for contributing Tarantool!
-
 ## See Also
 
  * [Tarantool][]
