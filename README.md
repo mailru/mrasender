@@ -16,10 +16,10 @@ box.cfg{
 local agent = require('mrasender')
 local log   = require('log')
 
-local username = 'USERNAME@mail.ru'
-local password = 'PASSWORD'
+local username  = 'USERNAME@mail.ru'
+local password  = 'PASSWORD'
 local recipient = 'RECIPIENT@mail.ru'
-local msg = 'Test message from tarantool'
+local msg       = 'Test message from tarantool'
 
 -- send message to recipient from username
 local res = agent.send_message_to_mra(username, password, recipient, msg)
