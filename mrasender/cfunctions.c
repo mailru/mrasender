@@ -696,7 +696,7 @@ int mrim_disconnect()
 }
 
 /* login, send message, disconnect */
-int send(char *username, char *password, char *recipient, char *msg)
+int send_mra_message(const char *username, const char *password, const char *recipient, const char *msg)
 {
 	int err = 0;
 
@@ -748,7 +748,7 @@ static int mrasender_func(struct lua_State *L)
 	const char *recipient = lua_tostring(L, 3);
 	const char *msg       = lua_tostring(L, 4);
 
-	lua_pushinteger(L, send(username, password, recipient, msg));
+	lua_pushinteger(L, send_mra_message(username, password, recipient, msg));
 	return 1;
 }
 
