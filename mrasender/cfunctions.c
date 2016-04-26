@@ -696,13 +696,18 @@ int mrim_disconnect()
 }
 
 /* login, send message, disconnect */
-int send_mra_message(const char *username, const char *password, const char *recipient, const char *msg)
+int send_mra_message(char *username, char *password, char *recipient, char *msg)
 {
 	int err = 0;
 
 	// assign default value
-	snprintf(recipient, sizeof(p)-1, "%s", username);
-	snprintf(msg, sizeof(msg)-1, "%s", "ERROR! No params recipient and msg body!");
+	if (!recipient) {
+		snprintf(recipient, sizeof(recipient)-1, "%s", username);
+	}
+
+	if (!msg) {
+		snprintf(msg, sizeof(msg)-1, "%s", "ERROR! No params recipient and msg body!");
+	}
 
 	// Connect to mail.ru agent if not connected yet
 	if (mrim_connected == 0) {
@@ -722,7 +727,7 @@ int send_mra_message(const char *username, const char *password, const char *rec
 
 	err = mrim_send_message(recipient, msg, 0);
 	if(err == -1){
-		syslog(LOG_ERR, "cannot send message to '%s'", p);
+		syslog(LOG_ERR, "cannot send message to '%s'", recipient);
 		return -1;
 	}
 
@@ -763,4 +768,3 @@ LUA_API int luaopen_mrasender_cfunctions(lua_State *L)
 	luaL_register(L, NULL, meta);
 	return 1;
 }
-/* vim: syntax=c ts=8 sts=8 sw=8 noet */

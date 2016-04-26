@@ -6,7 +6,24 @@
 
 ## HOWTO
 
-Will comeing soon....
+#!/usr/bin/env tarantool
+
+box.cfg{
+        log_level = 5
+}
+
+local agent = require('mrasender')
+local log   = require('log')
+
+local username = 'USERNAME@mail.ru'
+local password = 'PASSWORD'
+local recipient = 'RECIPIENT_EMAIL'
+local msg = 'Test message from tarantool'
+
+-- send message to recipient from username
+local res = agent.send_message_to_mra(username, password, recipient, msg)
+
+log.info("Result to send message to:"..recipient.." - "..res);
 
 Enjoy!
 Thank your for contributing Tarantool!
