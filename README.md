@@ -5,6 +5,7 @@
  * Tarantool 1.6.5+ with header files (tarantool && tarantool-dev packages)
 
 ## HOWTO
+```
 
 #!/usr/bin/env tarantool
 
@@ -23,8 +24,9 @@ local msg = 'Test message from tarantool'
 -- send message to recipient from username
 local res = agent.send_message_to_mra(username, password, recipient, msg)
 
-log.info("Result to send message to:"..recipient.." - "..res);
+log.info("Send message to:"..recipient..", result:"..res);
 
+```
 Enjoy!
 Thank your for contributing Tarantool!
 
