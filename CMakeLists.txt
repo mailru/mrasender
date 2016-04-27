@@ -29,8 +29,8 @@ enable_testing()
 
 set (LUA_PATH "LUA_PATH=${PROJECT_SOURCE_DIR}/?.lua\\;${PROJECT_SOURCE_DIR}/?/init.lua\\;;")
 
-add_test(mrasender ${CMAKE_SOURCE_DIR}/test/mrasender.test.lua)
-set_tests_properties(mrasender PROPERTIES ENVIRONMENT "${LUA_PATH}")
+# add_test(mrasender ${CMAKE_SOURCE_DIR}/test/mrasender.test.lua)
+# set_tests_properties(mrasender PROPERTIES ENVIRONMENT "${LUA_PATH}")
 
 # Add `make check`
 add_custom_target(check
