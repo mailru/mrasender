@@ -1,7 +1,7 @@
 Name: tarantool-mrasender
 Version: 1.0.1
 Release: 1%{?dist}
-Summary: Templates for Tarantool modules
+Summary: Tarantool module for sending messages to Mail.ru Agent
 Group: Applications/Databases
 License: BSD
 URL: https://github.com/tarantool/mrasender
