@@ -720,7 +720,7 @@ int send_mra_message(char *username, char *password, char *recipient, char *msg)
 	}
 
 	if (mrim_is_readable(0, 100)) {
-		if(mrim_net_read() == -1){
+		if(mrim_net_read() == -1) {
 			mrim_connected = 0;
 		}
 	}
@@ -728,14 +728,17 @@ int send_mra_message(char *username, char *password, char *recipient, char *msg)
 	err = mrim_send_message(recipient, msg, 0);
 	if(err == -1){
 		syslog(LOG_ERR, "cannot send message to '%s'", recipient);
+		mrim_disconnect();
+		if (rx_buf) free(rx_buf);
+		if (tx_buf) free(tx_buf);
 		return -1;
 	}
 
-	usleep (100000);
+	sleep(1);
 	mrim_disconnect();
 
-	free(rx_buf);
-	free(tx_buf);
+	if (rx_buf) free(rx_buf);
+	if (tx_buf) free(tx_buf);
 
 	return 0;
 }
