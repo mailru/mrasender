@@ -146,16 +146,18 @@ typedef struct _mrim_packet_header_t {
 	u_char   reserved[16];        // reserved
 } mrim_packet_header_t;
 
-int mra_socket;            // mra socket
-char *tx_buf;            // TX buffer
-unsigned int tx_len;            // TX buffer size
-char *rx_buf;            // RX buffer
-unsigned int rx_len;            // RX buffer size
-unsigned int seq;           // Sequence number
-int received_hello_ack;     // Is 'hello' message received
-int received_login_ack;     // Is 'login OK' message recievied
-int received_login_rej;     // Is 'login FAIL' message received
-
+typedef struct mrasender
+{
+	int mra_socket;             // mra socket
+	char *tx_buf;               // TX buffer
+	unsigned int tx_len;        // TX buffer size
+	char *rx_buf;               // RX buffer
+	unsigned int rx_len;        // RX buffer size
+	unsigned int seq;           // Sequence number
+	int received_hello_ack;     // Is 'hello' message received
+	int received_login_ack;     // Is 'login OK' message recievied
+	int received_login_rej;     // Is 'login FAIL' message received
+} run_data;
 
 /* mrim connect */
 int mrim_connect_tcp(char *host, char *port)
@@ -233,83 +235,83 @@ void mrim_net_fill_cs_header(mrim_packet_header_t *head, uint32_t seq, uint32_t 
 }
 
 /* Fill RX buffer */
-void mrim_net_send(void *data, size_t len)
+void mrim_net_send(run_data *work_data, void *data, size_t len)
 {
-	tx_buf = (char *) realloc(tx_buf, tx_len + len);
-	memcpy(tx_buf + tx_len, data, len);
-	tx_len += len;
+	work_data->tx_buf = (char *) realloc(work_data->tx_buf, work_data->tx_len + len);
+	memcpy(work_data->tx_buf + work_data->tx_len, data, len);
+	work_data->tx_len += len;
 }
 
 /* Do send RX buffer */
-int mrim_net_send_flush()
+int mrim_net_send_flush(run_data *work_data)
 {
 	//tx_len + len
 
-	if (write(mra_socket, tx_buf, tx_len) == -1 && errno != EINTR) {
+	if (write(work_data->mra_socket, work_data->tx_buf, work_data->tx_len) == -1 && errno != EINTR) {
 		say_crit("cannot write data to socket: %s (%d)", strerror(errno), errno);
 		return -1;
 	} else {
-		memset(tx_buf, 0, sizeof(tx_buf));
-		tx_len = 0;
+		memset(work_data->tx_buf, 0, sizeof(work_data->tx_buf));
+		work_data->tx_len = 0;
 		return 0;
 	}
 }
 
 /* Send 'receive ack' packet */
-int mrim_net_send_receive_ack(char *from, uint32_t msg_id)
+int mrim_net_send_receive_ack(run_data *work_data, char *from, uint32_t msg_id)
 {
 	mrim_packet_header_t head;
 	char *from_lps = mrim_net_mklps(from);
 
 	memset(&head, 0, sizeof(head));
 
-	mrim_net_fill_cs_header(&head, seq++, MRIM_CS_MESSAGE_RECV, LPSSIZE(from_lps) + sizeof(msg_id));
-	mrim_net_send(&head,    sizeof(head));
-	mrim_net_send(from_lps, LPSSIZE(from_lps));
-	mrim_net_send(&msg_id,  sizeof(msg_id));
+	mrim_net_fill_cs_header(&head, work_data->seq++, MRIM_CS_MESSAGE_RECV, LPSSIZE(from_lps) + sizeof(msg_id));
+	mrim_net_send(work_data, &head, sizeof(head));
+	mrim_net_send(work_data, from_lps, LPSSIZE(from_lps));
+	mrim_net_send(work_data, &msg_id, sizeof(msg_id));
 	free(from_lps);
 	
-	if (mrim_net_send_flush() == -1) {
+	if (mrim_net_send_flush(work_data) == -1) {
 		return -1;
 	}
 	return 0;
 }
 
 /* Send 'auth ack' packet */
-int mrim_net_send_auth_request_ack(char *email)
+int mrim_net_send_auth_request_ack(run_data *work_data, char *email)
 {
 	mrim_packet_header_t head;
 	char *email_lps = mrim_net_mklps(email);
 
 	memset(&head, 0, sizeof(head));
 
-	mrim_net_fill_cs_header(&head, seq++, MRIM_CS_AUTHORIZE, LPSSIZE(email_lps));
-	mrim_net_send(&head,  sizeof(head));
-	mrim_net_send(email_lps, LPSSIZE(email_lps));
+	mrim_net_fill_cs_header(&head, work_data->seq++, MRIM_CS_AUTHORIZE, LPSSIZE(email_lps));
+	mrim_net_send(work_data, &head,  sizeof(head));
+	mrim_net_send(work_data, email_lps, LPSSIZE(email_lps));
 	free(email_lps);
 	
-	if (mrim_net_send_flush() == -1) {
+	if (mrim_net_send_flush(work_data) == -1) {
 		return -1;
 	}
 	return 0;
 }
 
 /* Send 'hello' packet */
-int mrim_send_hello()
+int mrim_send_hello(run_data *work_data)
 {
 	mrim_packet_header_t head;
 
 	memset(&head, 0, sizeof(head));
 
-	mrim_net_fill_cs_header(&head, seq++, MRIM_CS_HELLO, 0);
-	mrim_net_send(&head, sizeof(head));
+	mrim_net_fill_cs_header(&head, work_data->seq++, MRIM_CS_HELLO, 0);
+	mrim_net_send(work_data, &head, sizeof(head));
 
-	if (mrim_net_send_flush() == -1) {
+	if (mrim_net_send_flush(work_data) == -1) {
 		return -1;
 	}
 
-	while (received_hello_ack == 0) {
-		if (mrim_net_read() == -1) {
+	while (work_data->received_hello_ack == 0) {
+		if (mrim_net_read(work_data) == -1) {
 			return -1;
 		}
 	}
@@ -318,7 +320,7 @@ int mrim_send_hello()
 }
 
 /* Send 'auth' packet*/
-int mrim_send_auth(const char *username, const char *password, uint32_t status)
+int mrim_send_auth(run_data *work_data, const char *username, const char *password, uint32_t status)
 {
 	mrim_packet_header_t head;
 	char *username_lps;
@@ -335,25 +337,27 @@ int mrim_send_auth(const char *username, const char *password, uint32_t status)
 	desc_lps     = mrim_net_mklps(VERSION_TXT);
 
 	// send all data
-	mrim_net_fill_cs_header(&head, seq++, MRIM_CS_LOGIN2, LPSSIZE(username_lps) + LPSSIZE(password_lps) + LPSSIZE(desc_lps) + sizeof(uint32_t) * 6);
-	mrim_net_send(&head,        sizeof(head));
-	mrim_net_send(username_lps, LPSSIZE(username_lps));
-	mrim_net_send(password_lps, LPSSIZE(password_lps));
-	mrim_net_send(&status,      sizeof(status));
-	mrim_net_send(desc_lps,     LPSSIZE(desc_lps));
+	mrim_net_fill_cs_header(&head, work_data->seq++, MRIM_CS_LOGIN2, LPSSIZE(username_lps) + LPSSIZE(password_lps) + LPSSIZE(desc_lps) + sizeof(uint32_t) * 6);
+	mrim_net_send(work_data, &head, sizeof(head));
+	mrim_net_send(work_data, username_lps, LPSSIZE(username_lps));
+	mrim_net_send(work_data, password_lps, LPSSIZE(password_lps));
+	mrim_net_send(work_data, &status, sizeof(status));
+	mrim_net_send(work_data, desc_lps, LPSSIZE(desc_lps));
+
 	for (i = 0; i < 5; i++) {
-		mrim_net_send(&dw,      sizeof(dw));
+		mrim_net_send(work_data, &dw, sizeof(dw));
 	}
+
 	free(username_lps);
 	free(password_lps);
 	free(desc_lps);
 
-	if (mrim_net_send_flush() == -1) {
+	if (mrim_net_send_flush(work_data) == -1) {
 		return -1;
 	}
 
-	while (received_login_ack == 0 && received_login_rej == 0) {
-		if (mrim_net_read() == -1) {
+	while (work_data->received_login_ack == 0 && work_data->received_login_rej == 0) {
+		if (mrim_net_read(work_data) == -1) {
 			return -1;
 		}
 	}
@@ -362,7 +366,7 @@ int mrim_send_auth(const char *username, const char *password, uint32_t status)
 }
 
 /* Send 'message' packet */
-int mrim_send_message(const char *to, const char *message, uint32_t flags)
+int mrim_send_message(run_data *work_data, const char *to, const char *message, uint32_t flags)
 {
 	mrim_packet_header_t head;
 	char *to_lps;
@@ -376,13 +380,13 @@ int mrim_send_message(const char *to, const char *message, uint32_t flags)
 	message_lps = mrim_net_mklps(message);
 	message_rtf_lps = mrim_net_mklps(" ");
 
-	mrim_net_fill_cs_header(&head, seq++, MRIM_CS_MESSAGE, sizeof(uint32_t) + LPSSIZE(to_lps) + LPSSIZE(message_lps) + LPSSIZE(message_rtf_lps));
-	mrim_net_send(&head,  sizeof(head));
-	mrim_net_send(&flags, sizeof(uint32_t));
-	mrim_net_send(to_lps, LPSSIZE(to_lps));
-	mrim_net_send(message_lps, LPSSIZE(message_lps));
-	mrim_net_send(message_rtf_lps, LPSSIZE(message_rtf_lps));
-	ret = mrim_net_send_flush();
+	mrim_net_fill_cs_header(&head, work_data->seq++, MRIM_CS_MESSAGE, sizeof(uint32_t) + LPSSIZE(to_lps) + LPSSIZE(message_lps) + LPSSIZE(message_rtf_lps));
+	mrim_net_send(work_data, &head,  sizeof(head));
+	mrim_net_send(work_data, &flags, sizeof(uint32_t));
+	mrim_net_send(work_data, to_lps, LPSSIZE(to_lps));
+	mrim_net_send(work_data, message_lps, LPSSIZE(message_lps));
+	mrim_net_send(work_data, message_rtf_lps, LPSSIZE(message_rtf_lps));
+	ret = mrim_net_send_flush(work_data);
 
 	free(to_lps);
 	free(message_lps);
@@ -392,26 +396,24 @@ int mrim_send_message(const char *to, const char *message, uint32_t flags)
 }
 
 /* Send 'ping' packet */
-int mrim_send_ping()
+int mrim_send_ping(run_data *work_data)
 {
 	mrim_packet_header_t head;
 	memset(&head, 0, sizeof(head));
 	
 	say_crit("Send 'PING' packet");
 
-	mrim_net_fill_cs_header(&head, seq++, MRIM_CS_PING, 0);
-	mrim_net_send(&head, sizeof(head));
-	return mrim_net_send_flush();
+	mrim_net_fill_cs_header(&head, work_data->seq++, MRIM_CS_PING, 0);
+	mrim_net_send(work_data, &head, sizeof(head));
+	return mrim_net_send_flush(work_data);
 }
 
 /* Read incoming 'message' packet */
-void mrim_read_message(char *answer, uint32_t len)
+void mrim_read_message(run_data *work_data, char *answer, uint32_t len)
 {
 	uint32_t msg_id;
 	uint32_t flags;
 	char *from;
-//	char *message;
-//	char *message_rtf;
 
 	// parse data
 	msg_id = *(uint32_t *) answer;
@@ -419,19 +421,16 @@ void mrim_read_message(char *answer, uint32_t len)
 	flags = *(uint32_t *) answer;
 	answer += sizeof(uint32_t);
 	from = mrim_net_mksz(answer);
-//	answer += LPSSIZE(answer);
-//	message = cp1251_to_utf8(mra_net_mksz(answer));
-//	message_rtf = mra_net_mksz(answer);
 
 	// send receive ack if needed
 	if (!(flags & MESSAGE_FLAG_NORECV)) {
-		mrim_net_send_receive_ack(from, msg_id);
+		mrim_net_send_receive_ack(work_data, from, msg_id);
 	}
 
 	// proceed message
 	if (flags & MESSAGE_FLAG_AUTHORIZE) {
 		// authorization request
-		mrim_net_send_auth_request_ack(from);
+		mrim_net_send_auth_request_ack(work_data, from);
 //	} else if (flags & MESSAGE_FLAG_SYSTEM) {
 //		// system message
 //	} else if (flags & MESSAGE_FLAG_CONTACT) {
@@ -443,12 +442,10 @@ void mrim_read_message(char *answer, uint32_t len)
 	}
 
 	free(from);
-//	free(message);
-//	free(message_rtf);
 }
 
 /*	Read and parce incoming message */
-int mrim_net_read_proceed()
+int mrim_net_read_proceed(run_data *work_data)
 {
 	mrim_packet_header_t *head;
 	size_t packet_len = 0;
@@ -458,18 +455,16 @@ int mrim_net_read_proceed()
 
 	memset(&head, 0, sizeof(head));
 
-	if (rx_len == 0) {
-		//say_crit("mrim_net_read_proceed: no data");
+	if (work_data->rx_len == 0) {
 		return 0;
 	}
 
-	if (rx_len < sizeof(mrim_packet_header_t)) {
-		//say_crit("mrim_net_read_proceed: need more data");
+	if (work_data->rx_len < sizeof(mrim_packet_header_t)) {
 		return 0;
 	}
 
 	// detach MRIM packet header from readed data
-	head = (mrim_packet_header_t *) rx_buf;
+	head = (mrim_packet_header_t *) work_data->rx_buf;
 
 	// check if we have correct magic
 	if (head->magic != CS_MAGIC) {
@@ -481,35 +476,34 @@ int mrim_net_read_proceed()
 
 
 	// check if we received full packet
-	if (rx_len < packet_len) {
-		//say_crit("mrim_net_read_proceed: need more data");
+	if (work_data->rx_len < packet_len) {
 		return 0;
 	}
 
 	// get answer value
-	answer = rx_buf + sizeof(mrim_packet_header_t);
+	answer = work_data->rx_buf + sizeof(mrim_packet_header_t);
 
 	// proceed packet
 	switch(head->msg) {
 		case MRIM_CS_HELLO_ACK:
 			// 'hello' packet
 			say_crit("received 'MRIM_CS_HELLO_ACK' packet");
-			received_hello_ack = 1;
+			work_data->received_hello_ack = 1;
 			break;
 		case MRIM_CS_LOGIN_ACK:
 			// 'login successful' packet
 			say_crit("received 'MRIM_CS_LOGIN_ACK' packet");
-			received_login_ack = 1;
+			work_data->received_login_ack = 1;
 			break;
 		case MRIM_CS_LOGIN_REJ:
 			// 'login failed' packet
 			say_crit("received 'MRIM_CS_LOGIN_REJ' packet");
-			received_login_rej = 1;
+			work_data->received_login_rej = 1;
 			break;
 		case MRIM_CS_MESSAGE_ACK:
 			// 'receive message' packet
 			say_crit("received 'MRIM_CS_MESSAGE_ACK' packet");
-			mrim_read_message(answer, head->dlen);
+			mrim_read_message(work_data, answer, head->dlen);
 			break;
 		case MRIM_CS_USER_INFO:
 			// 'user info' packet
@@ -529,23 +523,23 @@ int mrim_net_read_proceed()
 	}
 
 	// if we have more data in incoming buffer
-	if (rx_len > packet_len) {
+	if (work_data->rx_len > packet_len) {
 		// cut proceeded packet
-		next_packet = rx_buf + packet_len;
-		rx_len = rx_len - packet_len;
-		memmove(rx_buf, next_packet, rx_len);
-		rx_buf = realloc(rx_buf, rx_len);
+		next_packet = work_data->rx_buf + packet_len;
+		work_data->rx_len = work_data->rx_len - packet_len;
+		memmove(work_data->rx_buf, next_packet, work_data->rx_len);
+		work_data->rx_buf = realloc(work_data->rx_buf, work_data->rx_len);
 		return 0;
 	} else {
 		// else just empty buffer
-		rx_len = 0;
-		rx_buf = realloc(rx_buf, MRA_BUF_LEN + 1);
+		work_data->rx_len = 0;
+		work_data->rx_buf = realloc(work_data->rx_buf, MRA_BUF_LEN + 1);
 	}
 	return 1;
 }
 
 /* Read data from mail.ru agent server */
-int mrim_net_read()
+int mrim_net_read(run_data *work_data)
 {
 	int len;
 	char *buf;
@@ -553,12 +547,12 @@ int mrim_net_read()
 	int res = 0;
 
 	// increase buffer size
-	rx_buf = realloc(rx_buf, rx_len + MRA_BUF_LEN + 1);
+	work_data->rx_buf = realloc(work_data->rx_buf, work_data->rx_len + MRA_BUF_LEN + 1);
 
 	// read data from socket
-	buf = rx_buf + rx_len;
-	len = read(mra_socket, buf, MRA_BUF_LEN);
-	rx_len = rx_len + len;
+	buf = work_data->rx_buf + work_data->rx_len;
+	len = read(work_data->mra_socket, buf, MRA_BUF_LEN);
+	work_data->rx_len = work_data->rx_len + len;
 
 	if (len < 0 && errno == EAGAIN && errno != EINTR) {
 		// read more
@@ -574,7 +568,7 @@ int mrim_net_read()
 
 	// proceed received data while we can do it =)
 	while (res == 0) {
-		res = mrim_net_read_proceed();
+		res = mrim_net_read_proceed(work_data);
 
 		if (res == 0) {
 			net_read_try_count++;
@@ -589,20 +583,20 @@ int mrim_net_read()
 }
 
 /* Check if data exists */
-int mrim_is_readable(int timeout_sec, int timeout_usec)
+int mrim_is_readable(run_data *work_data, int timeout_sec, int timeout_usec)
 {
 	struct timeval tv;
 	fd_set rset;
 	int isready;
 
 	FD_ZERO(&rset);
-	FD_SET(mra_socket, &rset);
+	FD_SET(work_data->mra_socket, &rset);
 
 	tv.tv_sec  = timeout_sec;
 	tv.tv_usec = timeout_usec;
 
 again:
-	isready = select(mra_socket + 1, &rset, NULL, NULL, &tv);
+	isready = select(work_data->mra_socket + 1, &rset, NULL, NULL, &tv);
 	if (isready < 0) {
 		if (errno == EINTR) goto again;
 		say_crit("error on select socket: %s", strerror(errno));
@@ -613,7 +607,7 @@ again:
 }
 
 /*	split "host:port" to "host" and "port" */
-static void split_host_port(char * login_data, int login_data_size, char * host, int host_size, char * port, int port_size)
+static void split_host_port(char *login_data, int login_data_size, char *host, int host_size, char *port, int port_size)
 {
 	char *delim_pos = memchr(login_data, ':', login_data_size);
 
@@ -628,7 +622,7 @@ static void split_host_port(char * login_data, int login_data_size, char * host,
 }
 
 /*	Connect and login */
-int mrim_connect(char *login_host, char *login_port, char *username, char *password)
+int mrim_connect(run_data *work_data, char *login_host, char *login_port, char *username, char *password)
 {
 	int login_data_size = -1;
 	char login_data[24];
@@ -637,25 +631,25 @@ int mrim_connect(char *login_host, char *login_port, char *username, char *passw
 
 	say_crit("Start connect to server %s:%s, username: %s, password: %s", login_host, login_port, "***", "***");
 
-	received_hello_ack = 0;
-	received_login_ack = 0;
-	received_login_rej = 0;
+	work_data->received_hello_ack = 0;
+	work_data->received_login_ack = 0;
+	work_data->received_login_rej = 0;
 
-	if (mra_socket > 0) {
-		close(mra_socket);
+	if (work_data->mra_socket > 0) {
+		close(work_data->mra_socket);
 	}
 	// let's get server to connect to
-	if ((mra_socket = mrim_connect_tcp(login_host, login_port)) == -1) {
+	if ((work_data->mra_socket = mrim_connect_tcp(login_host, login_port)) == -1) {
 		say_crit("cannot connect to %s:%s", login_host, login_port);
 		return -1;
 	}
 
-	if ((login_data_size = read(mra_socket, login_data, sizeof(login_data))) == -1 && errno != EINTR) {
+	if ((login_data_size = read(work_data->mra_socket, login_data, sizeof(login_data))) == -1 && errno != EINTR) {
 		say_crit("cannot read data from socket: %s", strerror(errno));
 		return -1;
 	}
 
-	if ((mra_socket = close(mra_socket)) == -1 && errno != EINTR) {
+	if ((work_data->mra_socket = close(work_data->mra_socket)) == -1 && errno != EINTR) {
 		say_crit("cannot close socket: %s", strerror(errno));
 		return -1;
 	}
@@ -666,24 +660,24 @@ int mrim_connect(char *login_host, char *login_port, char *username, char *passw
 	say_crit("Login port: %s", port);
 
 	// let's connect to mrim server
-	if ((mra_socket = mrim_connect_tcp(host, port)) == -1) {
+	if ((work_data->mra_socket = mrim_connect_tcp(host, port)) == -1) {
 		say_crit("cannot connect to %s:%s", host, port);
 		return -1;
 	}
 
 	// send 'hello' packet
-	if (mrim_send_hello() == -1) {
+	if (mrim_send_hello(work_data) == -1) {
 		say_crit("cannot send 'hello' packet");
 		return -1;
 	}
 
 	// send 'login' packet
-	if (mrim_send_auth(username, password, STATUS_ONLINE) == -1) {
+	if (mrim_send_auth(work_data, username, password, STATUS_ONLINE) == -1) {
 		say_crit("cannot send 'login' packet");
 		return -1;
 	}
 
-	if (received_login_rej == 1) {
+	if (work_data->received_login_rej == 1) {
 		say_crit("cannot auth: username or password is wrong");
 		return -1;
 	}
@@ -692,35 +686,37 @@ int mrim_connect(char *login_host, char *login_port, char *username, char *passw
 }
 
 /* Disconnect */
-int mrim_disconnect()
+int mrim_disconnect(run_data *work_data)
 {
-	if (mra_socket > 0) {
-		shutdown(mra_socket, 1); 
-		close(mra_socket);
+	if (work_data->mra_socket) {
+		shutdown(work_data->mra_socket, 1); 
+		close(work_data->mra_socket);
 	}
 	return 0;
 }
 
 /* login, send message, disconnect */
-int send_mra_message(char *username, char *password, char *recipient, char *msg)
+int send_mra_message(const char *username, const char *password, const char *recipient, const char *msg)
 {
 	int err = 0;
-
-	int mra_socket = -1;            // mra socket
-	char *tx_buf = NULL;            // TX buffer
-	unsigned int tx_len;            // TX buffer size
-	char *rx_buf = NULL;            // RX buffer
-	unsigned int rx_len;            // RX buffer size
-
-	unsigned int seq = 0;           // Sequence number
-	int received_hello_ack = 0;     // Is 'hello' message received
-	int received_login_ack = 0;     // Is 'login OK' message recievied
-	int received_login_rej = 0;     // Is 'login FAIL' message received
 
 	char username_in[255];          // username
 	char password_in[255];          // recipient
 	char recipient_in[255];         // recipient
 	char msg_in[1024*1024];         // msg
+
+	run_data work_data;
+	memset(&work_data, 0, sizeof(work_data));
+
+	work_data.mra_socket = -1;            // mra socket
+	work_data.tx_buf = NULL;              // TX buffer
+	work_data.tx_len = 0;                 // TX buffer size
+	work_data.rx_buf = NULL;              // RX buffer
+	work_data.rx_len = 0;                 // RX buffer size
+	work_data.seq = 0;                    // Sequence number
+	work_data.received_hello_ack = 0;     // Is 'hello' message received
+	work_data.received_login_ack = 0;     // Is 'login OK' message recievied
+	work_data.received_login_rej = 0;     // Is 'login FAIL' message received
 
 	// assign username
 	if (username) {
@@ -754,52 +750,33 @@ int send_mra_message(char *username, char *password, char *recipient, char *msg)
 	}
 
 	// Connect to mail.ru agent if not connected yet
-	if (mrim_connect(MRA_HOST, MRA_PORT, username_in, password_in) == -1) {
+	if (mrim_connect(&work_data, MRA_HOST, MRA_PORT, username_in, password_in) == -1) {
 		say_crit("%s", "Can't connect to mail.ru agent");
-		mrim_disconnect();
+		mrim_disconnect(&work_data);
 		return -1;
 	}
 
-	if (mrim_is_readable(0, 500)) {
-		if(mrim_net_read() == -1) {
-			mrim_disconnect();
-			mrim_connect(MRA_HOST, MRA_PORT, username_in, password_in);
+	if (mrim_is_readable(&work_data, 0, 500)) {
+		if(mrim_net_read(&work_data) == -1) {
+			mrim_disconnect(&work_data);
+			mrim_connect(&work_data, MRA_HOST, MRA_PORT, username_in, password_in);
 		}
 	}
-	err = mrim_send_message(recipient_in, msg_in, 0);
+
+	err = mrim_send_message(&work_data, recipient_in, msg_in, 0);
 	if(err == -1){
 		say_crit("cannot send message to '%s'", recipient);
-		mrim_disconnect();
-		if (rx_buf) free(rx_buf);
-		if (tx_buf) free(tx_buf);
+		mrim_disconnect(&work_data);
+		if (work_data.rx_buf) free(work_data.rx_buf);
+		if (work_data.tx_buf) free(work_data.tx_buf);
 		return -4;
 	}
 
-	err = mrim_send_message(recipient_in, "ooo 1", 0);
-	if(err == -1){
-		say_crit("cannot send message to '%s'", recipient);
-		mrim_disconnect();
-		if (rx_buf) free(rx_buf);
-		if (tx_buf) free(tx_buf);
-		return -4;
-	}
+	fiber_sleep(1);
+	mrim_disconnect(&work_data);
 
-	err = mrim_send_message(recipient_in, "ooo 2", 0);
-	if(err == -1){
-		say_crit("cannot send message to '%s'", recipient);
-		mrim_disconnect();
-		if (rx_buf) free(rx_buf);
-		if (tx_buf) free(tx_buf);
-		return -4;
-	}
-
-
-
-	sleep(1);
-	mrim_disconnect();
-
-	if (rx_buf) free(rx_buf);
-	if (tx_buf) free(tx_buf);
+	if (work_data.rx_buf) free(work_data.rx_buf);
+	if (work_data.tx_buf) free(work_data.tx_buf);
 
 	return 0;
 }
