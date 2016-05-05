@@ -20,7 +20,7 @@
 
 #define MRA_HOST    						            "mrim.mail.ru"
 #define MRA_PORT    						            "2042"
-#define VERSION_TXT 						            "tarantool mra sender 1.0.1"
+#define VERSION_TXT 						            "tarantool mra sender 1.0.2"
 #define MRA_BUF_LEN  						            65536
 #define LPSLENGTH(s) 						            (*((uint32_t *)(s)))
 #define LPSSIZE(s)   						            (LPSLENGTH(s) + sizeof(uint32_t))
