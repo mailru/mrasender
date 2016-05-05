@@ -14,7 +14,6 @@
 #include <netdb.h>
 #include <errno.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <string.h>
 #include <assert.h>
 #include <signal.h>
@@ -147,16 +146,15 @@ typedef struct _mrim_packet_header_t {
 	u_char   reserved[16];        // reserved
 } mrim_packet_header_t;
 
-int mra_socket = -1;            // mra socket
-char *tx_buf = '\0';            // TX buffer
+int mra_socket;            // mra socket
+char *tx_buf;            // TX buffer
 unsigned int tx_len;            // TX buffer size
-char *rx_buf;                   // RX buffer
+char *rx_buf;            // RX buffer
 unsigned int rx_len;            // RX buffer size
-unsigned int seq = 0;           // Sequence number
-int received_hello_ack = 0;     // Is 'hello' message received
-int received_login_ack = 0;     // Is 'login OK' message recievied
-int received_login_rej = 0;     // Is 'login FAIL' message received
-int mrim_connected = 0;         // mrim is connected to server
+unsigned int seq;           // Sequence number
+int received_hello_ack;     // Is 'hello' message received
+int received_login_ack;     // Is 'login OK' message recievied
+int received_login_rej;     // Is 'login FAIL' message received
 
 
 /* mrim connect */
@@ -166,7 +164,7 @@ int mrim_connect_tcp(char *host, char *port)
 	struct addrinfo hints, *res;
 
 	if ((s = socket(PF_INET, SOCK_STREAM, 0)) == -1 && errno != EINTR) {
-		syslog(LOG_ERR, "cannot create socket: %s", strerror(errno));
+		say_crit("cannot create socket: %s", strerror(errno));
 		return -1;
 	}
 
@@ -177,19 +175,24 @@ int mrim_connect_tcp(char *host, char *port)
 	hints.ai_flags = 0;
 
 	if (getaddrinfo(host, port, &hints, &res) != 0 && errno != EINTR) {
-		syslog(LOG_ERR, "cannot getaddrinfo for %s:%s: %s", host, port, strerror(errno));
+		say_crit("cannot getaddrinfo for %s:%s: %s", host, port, strerror(errno));
 		close(s);
 		return -1;
 	}
 
 	if(connect(s, res->ai_addr, res->ai_addrlen) == -1){
-		syslog(LOG_ERR, "cannot connect to %s:%s: %s", host, port, strerror(errno));
-		freeaddrinfo(res);
+		say_crit("cannot connect to %s:%s: %s", host, port, strerror(errno));
+		if (res) {
+			freeaddrinfo(res);
+		}
 		close(s);
 		return -1;
 	}
 
-	freeaddrinfo(res);
+	if (res) {
+		freeaddrinfo(res);
+	}
+
 	return s;
 }
 
@@ -243,7 +246,7 @@ int mrim_net_send_flush()
 	//tx_len + len
 
 	if (write(mra_socket, tx_buf, tx_len) == -1 && errno != EINTR) {
-		syslog(LOG_ERR, "cannot write data to socket: %s (%d)", strerror(errno), errno);
+		say_crit("cannot write data to socket: %s (%d)", strerror(errno), errno);
 		return -1;
 	} else {
 		memset(tx_buf, 0, sizeof(tx_buf));
@@ -394,7 +397,7 @@ int mrim_send_ping()
 	mrim_packet_header_t head;
 	memset(&head, 0, sizeof(head));
 	
-	syslog(LOG_DEBUG, "Send 'PING' packet");
+	say_crit("Send 'PING' packet");
 
 	mrim_net_fill_cs_header(&head, seq++, MRIM_CS_PING, 0);
 	mrim_net_send(&head, sizeof(head));
@@ -456,11 +459,12 @@ int mrim_net_read_proceed()
 	memset(&head, 0, sizeof(head));
 
 	if (rx_len == 0) {
-		syslog(LOG_DEBUG, "no data");
+		//say_crit("mrim_net_read_proceed: no data");
 		return 0;
 	}
+
 	if (rx_len < sizeof(mrim_packet_header_t)) {
-		syslog(LOG_DEBUG, "need more data");
+		//say_crit("mrim_net_read_proceed: need more data");
 		return 0;
 	}
 
@@ -469,15 +473,16 @@ int mrim_net_read_proceed()
 
 	// check if we have correct magic
 	if (head->magic != CS_MAGIC) {
-		syslog(LOG_ERR, "wrong magic: 0x%08x", (uint32_t) head->magic);
+		say_crit("mrim_net_read_proceed: wrong magic: 0x%08x", (uint32_t) head->magic);
 		return -1;
 	}
 
 	packet_len = sizeof(mrim_packet_header_t) + head->dlen;
 
+
 	// check if we received full packet
 	if (rx_len < packet_len) {
-		syslog(LOG_DEBUG, "need more data");
+		//say_crit("mrim_net_read_proceed: need more data");
 		return 0;
 	}
 
@@ -488,39 +493,39 @@ int mrim_net_read_proceed()
 	switch(head->msg) {
 		case MRIM_CS_HELLO_ACK:
 			// 'hello' packet
-			syslog(LOG_DEBUG, "received 'MRIM_CS_HELLO_ACK' packet");
+			say_crit("received 'MRIM_CS_HELLO_ACK' packet");
 			received_hello_ack = 1;
 			break;
 		case MRIM_CS_LOGIN_ACK:
 			// 'login successful' packet
-			syslog(LOG_DEBUG, "received 'MRIM_CS_LOGIN_ACK' packet");
+			say_crit("received 'MRIM_CS_LOGIN_ACK' packet");
 			received_login_ack = 1;
 			break;
 		case MRIM_CS_LOGIN_REJ:
 			// 'login failed' packet
-			syslog(LOG_DEBUG, "received 'MRIM_CS_LOGIN_REJ' packet");
+			say_crit("received 'MRIM_CS_LOGIN_REJ' packet");
 			received_login_rej = 1;
 			break;
 		case MRIM_CS_MESSAGE_ACK:
 			// 'receive message' packet
-			syslog(LOG_DEBUG, "received 'MRIM_CS_MESSAGE_ACK' packet");
+			say_crit("received 'MRIM_CS_MESSAGE_ACK' packet");
 			mrim_read_message(answer, head->dlen);
 			break;
 		case MRIM_CS_USER_INFO:
 			// 'user info' packet
-			syslog(LOG_DEBUG, "received 'MRIM_CS_USER_INFO' packet");
+			say_crit("received 'MRIM_CS_USER_INFO' packet");
 			break;
 		case MRIM_CS_MESSAGE_STATUS:
 			// 'message status' packet
-			syslog(LOG_DEBUG, "received 'MRIM_CS_MESSAGE_STATUS' packet");
+			say_crit("received 'MRIM_CS_MESSAGE_STATUS' packet");
 			break;
 		case MRIM_CS_CONTACT_LIST2:
 			// 'contact list' packet
-			syslog(LOG_DEBUG, "received 'MRIM_CS_CONTACT_LIST2' packet");
+			say_crit("received 'MRIM_CS_CONTACT_LIST2' packet");
 			break;
 		default:
 			// unknown packet
-			syslog(LOG_DEBUG, "unknown packet received: 0x%04x", head->msg);
+			say_crit("unknown packet received: 0x%04x", head->msg);
 	}
 
 	// if we have more data in incoming buffer
@@ -559,11 +564,11 @@ int mrim_net_read()
 		// read more
 		return 0;
 	} else if (len < 0) {
-		syslog(LOG_ERR, "cannot read data from socket: %s", strerror(errno));
+		say_crit("cannot read data from socket: %s", strerror(errno));
 		return -1;
 	} else if (len == 0) {
 		// server closed the connection
-		syslog(LOG_ERR, "server closed the connection: %s", strerror(errno));
+		say_crit("server closed the connection: %s", strerror(errno));
 		return -1;
 	}
 
@@ -600,7 +605,7 @@ again:
 	isready = select(mra_socket + 1, &rset, NULL, NULL, &tv);
 	if (isready < 0) {
 		if (errno == EINTR) goto again;
-		syslog(LOG_ERR, "error on select socket: %s", strerror(errno));
+		say_crit("error on select socket: %s", strerror(errno));
 		return -1;
 	}
 
@@ -610,15 +615,15 @@ again:
 /*	split "host:port" to "host" and "port" */
 static void split_host_port(char * login_data, int login_data_size, char * host, int host_size, char * port, int port_size)
 {
-	char * delim_pos = memchr(login_data,':',login_data_size);
+	char *delim_pos = memchr(login_data, ':', login_data_size);
 
-	memset(host,0,host_size);
-	memset(port,0,port_size);
+	memset(host, 0, host_size);
+	memset(port, 0, port_size);
 
 	if (delim_pos){
 		*delim_pos='\0';
-		strncpy(host,login_data,host_size-1);
-		strncpy(port,delim_pos+1,port_size-1);
+		strncpy(host, login_data, host_size-1);
+		strncpy(port, delim_pos+1, port_size-1);
 	}
 }
 
@@ -630,7 +635,7 @@ int mrim_connect(char *login_host, char *login_port, char *username, char *passw
 	char host[16];
 	char port[5];
 
-	syslog(LOG_DEBUG, "Start connect to server %s:%s, username: %s, password: %s", login_host, login_port, "***", "***"); //TODO 
+	say_crit("Start connect to server %s:%s, username: %s, password: %s", login_host, login_port, "***", "***");
 
 	received_hello_ack = 0;
 	received_login_ack = 0;
@@ -641,45 +646,45 @@ int mrim_connect(char *login_host, char *login_port, char *username, char *passw
 	}
 	// let's get server to connect to
 	if ((mra_socket = mrim_connect_tcp(login_host, login_port)) == -1) {
-		syslog(LOG_ERR, "cannot connect to %s:%s", login_host, login_port);
+		say_crit("cannot connect to %s:%s", login_host, login_port);
 		return -1;
 	}
 
 	if ((login_data_size = read(mra_socket, login_data, sizeof(login_data))) == -1 && errno != EINTR) {
-		syslog(LOG_ERR, "cannot read data from socket: %s", strerror(errno));
+		say_crit("cannot read data from socket: %s", strerror(errno));
 		return -1;
 	}
 
 	if ((mra_socket = close(mra_socket)) == -1 && errno != EINTR) {
-		syslog(LOG_ERR, "cannot close socket: %s", strerror(errno));
+		say_crit("cannot close socket: %s", strerror(errno));
 		return -1;
 	}
 
 	
-	split_host_port(login_data,login_data_size,host,sizeof(host),port,sizeof(port));
-	syslog(LOG_DEBUG, "Login host: %s", host);
-	syslog(LOG_DEBUG, "Login port: %s", port);
+	split_host_port(login_data, login_data_size, host, sizeof(host), port, sizeof(port));
+	say_crit("Login host: %s", host);
+	say_crit("Login port: %s", port);
 
 	// let's connect to mrim server
 	if ((mra_socket = mrim_connect_tcp(host, port)) == -1) {
-		syslog(LOG_ERR, "cannot connect to %s:%s", host, port);
+		say_crit("cannot connect to %s:%s", host, port);
 		return -1;
 	}
 
 	// send 'hello' packet
 	if (mrim_send_hello() == -1) {
-		syslog(LOG_ERR, "cannot send 'hello' packet");
+		say_crit("cannot send 'hello' packet");
 		return -1;
 	}
 
 	// send 'login' packet
 	if (mrim_send_auth(username, password, STATUS_ONLINE) == -1) {
-		syslog(LOG_ERR, "cannot send 'login' packet");
+		say_crit("cannot send 'login' packet");
 		return -1;
 	}
 
 	if (received_login_rej == 1) {
-		syslog(LOG_ERR, "cannot auth: username or password is wrong");
+		say_crit("cannot auth: username or password is wrong");
 		return -1;
 	}
 
@@ -690,6 +695,7 @@ int mrim_connect(char *login_host, char *login_port, char *username, char *passw
 int mrim_disconnect()
 {
 	if (mra_socket > 0) {
+		shutdown(mra_socket, 1); 
 		close(mra_socket);
 	}
 	return 0;
@@ -700,39 +706,94 @@ int send_mra_message(char *username, char *password, char *recipient, char *msg)
 {
 	int err = 0;
 
-	// assign default value
-	if (!recipient) {
-		snprintf(recipient, sizeof(recipient)-1, "%s", username);
+	int mra_socket = -1;            // mra socket
+	char *tx_buf = NULL;            // TX buffer
+	unsigned int tx_len;            // TX buffer size
+	char *rx_buf = NULL;            // RX buffer
+	unsigned int rx_len;            // RX buffer size
+
+	unsigned int seq = 0;           // Sequence number
+	int received_hello_ack = 0;     // Is 'hello' message received
+	int received_login_ack = 0;     // Is 'login OK' message recievied
+	int received_login_rej = 0;     // Is 'login FAIL' message received
+
+	char username_in[255];          // username
+	char password_in[255];          // recipient
+	char recipient_in[255];         // recipient
+	char msg_in[1024*1024];         // msg
+
+	// assign username
+	if (username) {
+		snprintf(username_in, sizeof(username_in)-1, "%s", username);
+	} else {
+		return -2;
 	}
 
-	if (!msg) {
-		snprintf(msg, sizeof(msg)-1, "%s", "ERROR! No params recipient and msg body!");
+	// assign password
+	if (password) {
+		snprintf(password_in, sizeof(password_in)-1, "%s", password);
+	} else {
+		return -3;
+	}
+
+	// assign recipient
+	if (recipient) {
+		snprintf(recipient_in, sizeof(recipient_in)-1, "%s", recipient);
+	}
+
+	if (!recipient_in) {
+		snprintf(recipient_in, sizeof(recipient_in)-1, "%s", username);
+	}
+
+	if (msg) {
+		snprintf(msg_in, sizeof(msg_in)-1, "%s", msg);
+	}
+
+	if (!msg_in) {
+		snprintf(msg_in, sizeof(msg_in)-1, "%s", "ERROR! No params recipient and msg body!");
 	}
 
 	// Connect to mail.ru agent if not connected yet
-	if (mrim_connected == 0) {
-		if (mrim_connect(MRA_HOST, MRA_PORT, username, password) == -1) {
-			syslog(LOG_ERR, "Can't connect to mail.ru agent");
-			mrim_disconnect();
-			return -1;
-		}
-		mrim_connected = 1;
+	if (mrim_connect(MRA_HOST, MRA_PORT, username_in, password_in) == -1) {
+		say_crit("%s", "Can't connect to mail.ru agent");
+		mrim_disconnect();
+		return -1;
 	}
 
-	if (mrim_is_readable(0, 100)) {
+	if (mrim_is_readable(0, 500)) {
 		if(mrim_net_read() == -1) {
-			mrim_connected = 0;
+			mrim_disconnect();
+			mrim_connect(MRA_HOST, MRA_PORT, username_in, password_in);
 		}
 	}
-
-	err = mrim_send_message(recipient, msg, 0);
+	err = mrim_send_message(recipient_in, msg_in, 0);
 	if(err == -1){
-		syslog(LOG_ERR, "cannot send message to '%s'", recipient);
+		say_crit("cannot send message to '%s'", recipient);
 		mrim_disconnect();
 		if (rx_buf) free(rx_buf);
 		if (tx_buf) free(tx_buf);
-		return -1;
+		return -4;
 	}
+
+	err = mrim_send_message(recipient_in, "ooo 1", 0);
+	if(err == -1){
+		say_crit("cannot send message to '%s'", recipient);
+		mrim_disconnect();
+		if (rx_buf) free(rx_buf);
+		if (tx_buf) free(tx_buf);
+		return -4;
+	}
+
+	err = mrim_send_message(recipient_in, "ooo 2", 0);
+	if(err == -1){
+		say_crit("cannot send message to '%s'", recipient);
+		mrim_disconnect();
+		if (rx_buf) free(rx_buf);
+		if (tx_buf) free(tx_buf);
+		return -4;
+	}
+
+
 
 	sleep(1);
 	mrim_disconnect();
