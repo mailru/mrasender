@@ -2,7 +2,7 @@ package = 'mrasender'
 version = '1.0.1'
 
 source  = {
-    url    = 'git://github.com/tarantool/mrasender.git';
+    url    = 'git+https://github.com/tarantool/mrasender.git';
     branch = 'master';
 }
 
